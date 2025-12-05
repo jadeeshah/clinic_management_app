@@ -46,7 +46,8 @@ module.exports = (env, argv) => ({
     })
   ],
   optimization: {
-    splitChunks: {
+    // Only split chunks in production to avoid dev server conflicts
+    splitChunks: argv.mode === 'production' ? {
       chunks: 'all',
       cacheGroups: {
         vendor: {
@@ -55,7 +56,7 @@ module.exports = (env, argv) => ({
           chunks: 'all',
         },
       },
-    },
+    } : false,
     minimize: argv.mode === 'production',
   },
   devServer: {
