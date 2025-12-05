@@ -1,13 +1,15 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
-module.exports = {
+module.exports = (env, argv) => ({
+  mode: argv.mode || 'development',
   entry: './src/renderer/index.tsx',
   target: 'web',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js',
-    publicPath: '/'
+    filename: argv.mode === 'production' ? '[name].[contenthash].js' : 'bundle.js',
+    publicPath: '/',
+    clean: true,
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js', '.jsx'],
@@ -43,6 +45,19 @@ module.exports = {
       filename: 'index.html'
     })
   ],
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all',
+        },
+      },
+    },
+    minimize: argv.mode === 'production',
+  },
   devServer: {
     static: {
       directory: path.join(__dirname, 'public')
@@ -54,4 +69,4 @@ module.exports = {
       'Access-Control-Allow-Origin': '*'
     }
   }
-};
+});
