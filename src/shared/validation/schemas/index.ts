@@ -11,3 +11,4 @@ export * from './service';
 export * from './package';
 export * from './expense';
 export * from './user';
+export * from './investigation';

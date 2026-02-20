@@ -16,16 +16,23 @@ import {
   DialogContentText,
   DialogActions,
 } from '@mui/material';
-import { Save as SaveIcon, Backup as BackupIcon, DataObject as DataIcon, CloudUpload as UploadIcon, Close as CloseIcon } from '@mui/icons-material';
+import { Save as SaveIcon, Backup as BackupIcon, DataObject as DataIcon, CloudUpload as UploadIcon, Close as CloseIcon, DeleteForever as DeleteIcon } from '@mui/icons-material';
 import type { Settings as SettingsType } from '../../types';
+import { useAuth } from '../contexts/AuthContext';
 
 const Settings: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+
   const [settings, setSettings] = useState<Partial<SettingsType>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showDemoDataDialog, setShowDemoDataDialog] = useState(false);
+  const [showDeleteDataDialog, setShowDeleteDataDialog] = useState(false);
   const [isLoadingDemoData, setIsLoadingDemoData] = useState(false);
+  const [isDeletingData, setIsDeletingData] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,15 +78,38 @@ const Settings: React.FC = () => {
   };
 
   const handleBackup = async () => {
+    setIsBackingUp(true);
+    setMessage(null);
     try {
       const result = await window.electronAPI.backup.create();
       if (result.success) {
-        setMessage({ type: 'success', text: `Backup created: ${result.data}` });
+        setMessage({ type: 'success', text: `Backup created successfully: ${result.data}` });
       } else {
         setMessage({ type: 'error', text: result.error || 'Backup failed' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Backup failed' });
+      setMessage({ type: 'error', text: 'Backup failed: ' + (error as Error).message });
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleDeleteAllData = async () => {
+    setIsDeletingData(true);
+    setShowDeleteDataDialog(false);
+    setMessage(null);
+
+    try {
+      const result = await window.electronAPI.database.execute('clear-all-data');
+      if (result.success) {
+        setMessage({ type: 'success', text: 'All data deleted successfully. Services and settings preserved.' });
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Failed to delete data' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to delete data: ' + (error as Error).message });
+    } finally {
+      setIsDeletingData(false);
     }
   };
 
@@ -329,35 +359,49 @@ const Settings: React.FC = () => {
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 3 }}>
                 <Button
                   variant="outlined"
-                  startIcon={<BackupIcon />}
+                  startIcon={isBackingUp ? <CircularProgress size={20} /> : <BackupIcon />}
                   onClick={handleBackup}
+                  disabled={isBackingUp}
                 >
-                  Create Backup Now
+                  {isBackingUp ? 'Creating Backup...' : 'Create Backup Now'}
                 </Button>
                 <Typography variant="body2" color="text.secondary">
                   Automatic backups are created daily on app startup
                 </Typography>
               </Box>
 
-              <Divider sx={{ mb: 2 }} />
+              {isAdmin && (
+                <>
+                  <Divider sx={{ mb: 2 }} />
 
-              <Typography variant="subtitle2" gutterBottom>
-                Demo Data
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  startIcon={isLoadingDemoData ? <CircularProgress size={20} /> : <DataIcon />}
-                  onClick={() => setShowDemoDataDialog(true)}
-                  disabled={isLoadingDemoData}
-                >
-                  Load Demo Data
-                </Button>
-                <Typography variant="body2" color="text.secondary">
-                  Load sample data for training and demonstrations
-                </Typography>
-              </Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Data Management (Admin Only)
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      startIcon={isLoadingDemoData ? <CircularProgress size={20} /> : <DataIcon />}
+                      onClick={() => setShowDemoDataDialog(true)}
+                      disabled={isLoadingDemoData || isDeletingData}
+                    >
+                      {isLoadingDemoData ? 'Loading...' : 'Load Demo Data'}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={isDeletingData ? <CircularProgress size={20} /> : <DeleteIcon />}
+                      onClick={() => setShowDeleteDataDialog(true)}
+                      disabled={isLoadingDemoData || isDeletingData}
+                    >
+                      {isDeletingData ? 'Deleting...' : 'Delete All Data'}
+                    </Button>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Load sample data for demos or delete all data (settings and services preserved)
+                  </Typography>
+                </>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -383,6 +427,41 @@ const Settings: React.FC = () => {
           <Button onClick={() => setShowDemoDataDialog(false)}>Cancel</Button>
           <Button onClick={handleLoadDemoData} color="warning" variant="contained">
             Load Demo Data
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete All Data Confirmation Dialog */}
+      <Dialog
+        open={showDeleteDataDialog}
+        onClose={() => setShowDeleteDataDialog(false)}
+        aria-labelledby="delete-data-dialog-title"
+      >
+        <DialogTitle id="delete-data-dialog-title" sx={{ color: 'error.main' }}>
+          Delete All Data?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will permanently delete ALL data including:
+          </DialogContentText>
+          <DialogContentText component="ul" sx={{ mt: 1 }}>
+            <li>All patients and their records</li>
+            <li>All doctors</li>
+            <li>All visits and appointments</li>
+            <li>All invoices and payments</li>
+            <li>All packages and expenses</li>
+          </DialogContentText>
+          <DialogContentText sx={{ mt: 2 }}>
+            Settings and services will be preserved. This action cannot be undone.
+          </DialogContentText>
+          <DialogContentText sx={{ mt: 2, fontWeight: 'bold', color: 'error.main' }}>
+            Are you absolutely sure?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteDataDialog(false)}>Cancel</Button>
+          <Button onClick={handleDeleteAllData} color="error" variant="contained">
+            Delete All Data
           </Button>
         </DialogActions>
       </Dialog>

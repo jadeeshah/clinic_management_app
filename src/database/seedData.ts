@@ -110,6 +110,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Ayesha Imran',
     emergencyContactPhone: '03001112234',
     emergencyContactRelation: 'Wife',
+    diagnosis: null,
     notes: 'Lower back pain, desk job. Regular physiotherapy patient.',
   },
   {
@@ -126,6 +127,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Tariq Siddiqui',
     emergencyContactPhone: '03009998878',
     emergencyContactRelation: 'Husband',
+    diagnosis: null,
     notes: 'Post-surgery knee rehabilitation. ACL reconstruction.',
   },
   {
@@ -142,6 +144,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Sana Hassan',
     emergencyContactPhone: '03215556678',
     emergencyContactRelation: 'Wife',
+    diagnosis: null,
     notes: 'Cervical spondylosis. Office worker with neck pain.',
   },
   {
@@ -158,6 +161,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Asad Ali',
     emergencyContactPhone: '03331234568',
     emergencyContactRelation: 'Son',
+    diagnosis: null,
     notes: 'Post-stroke rehabilitation. Right side weakness.',
   },
   {
@@ -174,6 +178,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Amna Ahmed',
     emergencyContactPhone: '03007654322',
     emergencyContactRelation: 'Mother',
+    diagnosis: null,
     notes: 'Sports injury - shoulder. Cricket player.',
   },
   {
@@ -190,6 +195,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Farooq Ahmad',
     emergencyContactPhone: '03111223345',
     emergencyContactRelation: 'Father',
+    diagnosis: null,
     notes: 'Chronic back pain. Teacher, standing for long hours.',
   },
   {
@@ -206,6 +212,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Nadia Bilal',
     emergencyContactPhone: '03009876124',
     emergencyContactRelation: 'Wife',
+    diagnosis: null,
     notes: 'Frozen shoulder. Diabetic patient.',
   },
   {
@@ -222,6 +229,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Shakeel Ahmed',
     emergencyContactPhone: '03215559989',
     emergencyContactRelation: 'Father',
+    diagnosis: null,
     notes: 'Postural issues. IT professional.',
   },
   {
@@ -238,6 +246,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Usman (Father)',
     emergencyContactPhone: '03331122335',
     emergencyContactRelation: 'Father',
+    diagnosis: null,
     notes: 'Pediatric patient. Developmental delay therapy.',
   },
   {
@@ -254,6 +263,7 @@ export const seedPatients: Omit<Patient, 'patientID' | 'createdAt' | 'updatedAt'
     emergencyContactName: 'Tariq Mehmood',
     emergencyContactPhone: '03007778890',
     emergencyContactRelation: 'Husband',
+    diagnosis: null,
     notes: 'Arthritis management. Both knees affected.',
   },
 ];
@@ -357,7 +367,7 @@ export const seedVisits: Array<{
   startTime: string;
   duration: number;
   status: 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled' | 'NoShow';
-  visitType: 'Evaluation' | 'FollowUp' | 'TherapySession';
+  visitType: string;
   sessionIndex: number | null;
   notes: string | null;
   patientPackageIndex?: number; // Optional link to patient package

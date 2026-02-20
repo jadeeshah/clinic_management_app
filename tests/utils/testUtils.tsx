@@ -74,6 +74,7 @@ export const createMockPatient = (overrides = {}) => ({
   emergencyContactName: null,
   emergencyContactPhone: null,
   emergencyContactRelation: null,
+  diagnosis: null,
   notes: null,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
@@ -191,5 +192,34 @@ export const createMockDashboardStats = (overrides = {}) => ({
   monthRevenue: 50000,
   outstandingBalance: 10000,
   todaySchedule: [],
+  ...overrides,
+});
+
+export const createMockInvestigation = (overrides = {}) => ({
+  investigationID: 1,
+  patientID: 1,
+  investigationType: 'X-Ray' as const,
+  investigationDate: '2024-01-15',
+  orderedByDoctorID: 1,
+  bodyPart: 'Lumbar Spine',
+  findings: 'Normal findings',
+  status: 'Completed' as const,
+  notes: null,
+  createdAt: '2024-01-15T00:00:00Z',
+  updatedAt: '2024-01-15T00:00:00Z',
+  doctorName: 'Dr. Sarah Smith',
+  ...overrides,
+});
+
+export const createMockPatientPackage = (overrides = {}) => ({
+  patientPackageID: 1,
+  patientID: 1,
+  packageID: 1,
+  purchaseDate: '2024-01-01',
+  expiryDate: '2024-01-31',
+  sessionsUsed: 3,
+  status: 'Active' as const,
+  packageName: '10 Session Package',
+  totalSessions: 10,
   ...overrides,
 });

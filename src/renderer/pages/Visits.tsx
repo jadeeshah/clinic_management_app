@@ -46,12 +46,14 @@ import {
 import type { Visit, Doctor, Patient, Service, PatientPackage } from '../../types';
 import { StatusChip, TableSkeleton, EmptyState, PackageProgress, VisitStatusWorkflow } from '../components';
 import { formatVisitType } from '../utils/formatters';
+import { isTimeWithinDoctorHours, getDoctorAvailabilityText } from '../utils/timeValidation';
 
 // Visit Form Component
 interface VisitFormProps {
   visit?: Visit | null;
   doctors: Doctor[];
   patients: Patient[];
+  services: Service[];
   defaultDuration: number;
   onSave: (visit: Partial<Visit>) => Promise<void>;
   onCancel: () => void;
@@ -62,6 +64,7 @@ const VisitForm: React.FC<VisitFormProps> = ({
   visit,
   doctors,
   patients,
+  services,
   defaultDuration,
   onSave,
   onCancel,
@@ -83,6 +86,7 @@ const VisitForm: React.FC<VisitFormProps> = ({
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [patientPackages, setPatientPackages] = useState<PatientPackage[]>([]);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
 
   useEffect(() => {
     if (visit) {
@@ -96,8 +100,13 @@ const VisitForm: React.FC<VisitFormProps> = ({
         setSelectedPatient(patient);
         loadPatientPackages(patient.patientID);
       }
+      // Find and set the selected doctor
+      const doctor = doctors.find(d => d.doctorID === visit.doctorID);
+      if (doctor) {
+        setSelectedDoctor(doctor);
+      }
     }
-  }, [visit, patients]);
+  }, [visit, patients, doctors]);
 
   useEffect(() => {
     if (patientSearch.length >= 2) {
@@ -168,6 +177,14 @@ const VisitForm: React.FC<VisitFormProps> = ({
     }
     if (!formData.startTime) {
       newErrors.startTime = 'Please select a time';
+    }
+
+    // Validate time is within doctor's availability
+    if (selectedDoctor && formData.startTime && formData.visitDate) {
+      const timeValidation = isTimeWithinDoctorHours(formData.startTime, selectedDoctor, formData.visitDate);
+      if (!timeValidation.valid) {
+        newErrors.startTime = timeValidation.message || 'Invalid time';
+      }
     }
 
     setErrors(newErrors);
@@ -270,7 +287,12 @@ const VisitForm: React.FC<VisitFormProps> = ({
           <Select
             value={formData.doctorID || ''}
             label="Doctor"
-            onChange={(e) => handleChange('doctorID')({ target: { value: e.target.value } })}
+            onChange={(e) => {
+              const doctorID = e.target.value as number;
+              handleChange('doctorID')({ target: { value: doctorID } });
+              const doctor = doctors.find(d => d.doctorID === doctorID);
+              setSelectedDoctor(doctor || null);
+            }}
           >
             {doctors.map((doctor) => (
               <MenuItem key={doctor.doctorID} value={doctor.doctorID}>
@@ -281,18 +303,27 @@ const VisitForm: React.FC<VisitFormProps> = ({
         </FormControl>
       </Grid>
 
-      {/* Visit Type */}
+      {/* Visit Type (dynamic from Services) */}
       <Grid item xs={12} sm={6}>
         <FormControl fullWidth>
           <InputLabel>Visit Type</InputLabel>
           <Select
-            value={formData.visitType || 'TherapySession'}
+            value={formData.visitType || ''}
             label="Visit Type"
             onChange={(e) => handleChange('visitType')({ target: { value: e.target.value } })}
           >
-            <MenuItem value="Evaluation">Evaluation</MenuItem>
-            <MenuItem value="FollowUp">Follow Up</MenuItem>
-            <MenuItem value="TherapySession">Therapy Session</MenuItem>
+            {services.length > 0 ? (
+              services.map((service) => (
+                <MenuItem key={service.serviceID} value={service.name}>
+                  {service.name}
+                </MenuItem>
+              ))
+            ) : (
+              <>
+                <MenuItem value="Physiotherapy Session">Physiotherapy Session</MenuItem>
+                <MenuItem value="Initial Evaluation">Initial Evaluation</MenuItem>
+              </>
+            )}
           </Select>
         </FormControl>
       </Grid>
@@ -321,7 +352,7 @@ const VisitForm: React.FC<VisitFormProps> = ({
           value={formData.startTime || ''}
           onChange={handleChange('startTime')}
           error={!!errors.startTime}
-          helperText={errors.startTime}
+          helperText={errors.startTime || (selectedDoctor ? `Doctor available: ${getDoctorAvailabilityText(selectedDoctor)}` : '')}
           InputLabelProps={{ shrink: true }}
           required
         />
@@ -407,6 +438,7 @@ const Visits: React.FC = () => {
   const [totalVisits, setTotalVisits] = useState(0);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [defaultDuration, setDefaultDuration] = useState(45);
 
   const [page, setPage] = useState(0);
@@ -463,15 +495,17 @@ const Visits: React.FC = () => {
 
   const loadInitialData = async () => {
     try {
-      const [doctorsResult, patientsResult, settingsResult] = await Promise.all([
+      const [doctorsResult, patientsResult, settingsResult, servicesResult] = await Promise.all([
         window.electronAPI.database.execute<Doctor[]>('get-doctors'),
         window.electronAPI.database.execute<{ items: Patient[]; total: number }>('get-patients', { limit: 100 }),
         window.electronAPI.database.execute<{ defaultVisitDuration: number }>('get-settings'),
+        window.electronAPI.database.execute<Service[]>('get-services'),
       ]);
 
       if (doctorsResult.success) setDoctors(doctorsResult.data || []);
       if (patientsResult.success) setPatients(patientsResult.data?.items || []);
       if (settingsResult.success) setDefaultDuration(settingsResult.data?.defaultVisitDuration || 45);
+      if (servicesResult.success) setServices(servicesResult.data || []);
     } catch (error) {
       console.error('Failed to load initial data:', error);
     }
@@ -847,6 +881,7 @@ const Visits: React.FC = () => {
               visit={selectedVisit}
               doctors={doctors}
               patients={patients}
+              services={services}
               defaultDuration={defaultDuration}
               onSave={handleSaveVisit}
               onCancel={() => {

@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS Patients (
     emergencyContactName TEXT,
     emergencyContactPhone TEXT,
     emergencyContactRelation TEXT,
+    diagnosis TEXT,
     notes TEXT,
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
     updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
@@ -116,7 +117,7 @@ CREATE TABLE IF NOT EXISTS Visits (
     endTime TEXT,
     duration INTEGER DEFAULT 45,
     status TEXT CHECK(status IN ('Scheduled', 'InProgress', 'Completed', 'Cancelled', 'NoShow')) DEFAULT 'Scheduled',
-    visitType TEXT CHECK(visitType IN ('Evaluation', 'FollowUp', 'TherapySession')) DEFAULT 'TherapySession',
+    visitType TEXT DEFAULT 'TherapySession',
     sessionIndex INTEGER,
     notes TEXT,
     patientPackageID INTEGER,
@@ -210,6 +211,26 @@ CREATE TABLE IF NOT EXISTS AuditLog (
     timestamp TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Investigations Table (for patient diagnostic tests)
+CREATE TABLE IF NOT EXISTS Investigations (
+    investigationID INTEGER PRIMARY KEY AUTOINCREMENT,
+    patientID INTEGER NOT NULL,
+    investigationType TEXT NOT NULL CHECK(investigationType IN (
+        'X-Ray', 'CT Scan', 'MRI', 'Ultrasound', 'NCS', 'EMG', 'Blood Test',
+        'Urine Test', 'ECG', 'DEXA Scan', 'Bone Scan', 'Other'
+    )),
+    investigationDate TEXT NOT NULL,
+    orderedByDoctorID INTEGER,
+    bodyPart TEXT,
+    findings TEXT,
+    status TEXT CHECK(status IN ('Ordered', 'Scheduled', 'Completed', 'Reviewed')) DEFAULT 'Ordered',
+    notes TEXT,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patientID) REFERENCES Patients(patientID) ON DELETE CASCADE,
+    FOREIGN KEY (orderedByDoctorID) REFERENCES Doctors(doctorID)
+);
+
 -- ============================================
 -- Indexes for Performance
 -- ============================================
@@ -227,6 +248,8 @@ CREATE INDEX IF NOT EXISTS idx_invoices_status ON Invoices(status);
 CREATE INDEX IF NOT EXISTS idx_payments_invoice ON Payments(invoiceID);
 CREATE INDEX IF NOT EXISTS idx_attachments_entity ON Attachments(entityType, entityID);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON Expenses(expenseDate);
+CREATE INDEX IF NOT EXISTS idx_investigations_patient ON Investigations(patientID);
+CREATE INDEX IF NOT EXISTS idx_investigations_date ON Investigations(investigationDate);
 
 -- ============================================
 -- Triggers for Auto-Update Timestamps

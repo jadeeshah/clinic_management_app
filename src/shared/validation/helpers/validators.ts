@@ -59,24 +59,24 @@ export const optionalTimeStringSchema = z
   .nullable()
   .or(z.literal(''));
 
-// Non-negative number (>= 0)
-export const nonNegativeNumberSchema = z
+// Non-negative number (>= 0) - uses coerce to handle string inputs from forms
+export const nonNegativeNumberSchema = z.coerce
   .number()
   .nonnegative('Value must be non-negative');
 
-// Positive number (> 0)
-export const positiveNumberSchema = z
+// Positive number (> 0) - uses coerce to handle string inputs from forms
+export const positiveNumberSchema = z.coerce
   .number()
   .positive('Value must be positive');
 
-// Entity ID validation (positive integer)
-export const idSchema = z
+// Entity ID validation (positive integer) - uses coerce for flexibility
+export const idSchema = z.coerce
   .number()
   .int('ID must be an integer')
   .positive('ID must be positive');
 
 // Optional ID (for foreign keys that can be null)
-export const optionalIdSchema = z
+export const optionalIdSchema = z.coerce
   .number()
   .int('ID must be an integer')
   .positive('ID must be positive')

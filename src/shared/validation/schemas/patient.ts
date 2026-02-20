@@ -16,6 +16,13 @@ import {
 // Sex enum matching database CHECK constraint
 export const sexEnum = z.enum(['Male', 'Female', 'Other']);
 
+// Diagnosis code schema
+const diagnosisCodeSchema = z.object({
+  code: z.string(),
+  description: z.string(),
+  category: z.string(),
+});
+
 /**
  * Schema for creating a new patient
  */
@@ -35,6 +42,10 @@ export const createPatientSchema = z.object({
   emergencyContactName: optionalTextSchema(100),
   emergencyContactPhone: optionalPhoneSchema,
   emergencyContactRelation: optionalTextSchema(50),
+  diagnosis: z.union([
+    z.string(),
+    z.array(diagnosisCodeSchema),
+  ]).optional().nullable(),
   notes: notesSchema,
 });
 

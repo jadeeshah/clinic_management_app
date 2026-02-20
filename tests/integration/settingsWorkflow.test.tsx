@@ -14,6 +14,17 @@ import { render } from '../utils/testUtils';
 import Settings from '../../src/renderer/pages/Settings';
 import { mockElectronAPI } from '../setupTests';
 
+// Mock useAuth to return admin user for testing admin-only features
+jest.mock('../../src/renderer/contexts/AuthContext', () => ({
+  ...jest.requireActual('../../src/renderer/contexts/AuthContext'),
+  useAuth: () => ({
+    user: { userID: 1, username: 'admin', role: 'Admin' },
+    isAuthenticated: true,
+    login: jest.fn(),
+    logout: jest.fn(),
+  }),
+}));
+
 const mockSettings = {
   settingsID: 1,
   clinicName: 'PhysioClinic Lahore',

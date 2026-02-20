@@ -40,7 +40,7 @@ import {
   AccountBalance as BalanceIcon,
   EventNote as VisitsIcon,
 } from '@mui/icons-material';
-import type { Expense, ExpenseCategory } from '../../types';
+import type { Expense, ExpenseCategory, Doctor } from '../../types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -76,6 +76,10 @@ const Finance: React.FC = () => {
   const [startDate, setStartDate] = useState(firstDayOfMonth);
   const [endDate, setEndDate] = useState(today.toISOString().split('T')[0]);
 
+  // Doctor filter
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctorFilter, setDoctorFilter] = useState<string>('');
+
   // Summary state
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(true);
@@ -96,17 +100,36 @@ const Finance: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    loadDoctors();
+  }, []);
+
+  useEffect(() => {
     loadSummary();
     loadExpenses();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, doctorFilter]);
+
+  const loadDoctors = async () => {
+    try {
+      const result = await window.electronAPI.database.execute<Doctor[]>('get-doctors');
+      if (result.success && result.data) {
+        setDoctors(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load doctors:', error);
+    }
+  };
 
   const loadSummary = async () => {
     setIsLoadingSummary(true);
     try {
-      const result = await window.electronAPI.database.execute<FinanceSummary>('get-finance-summary', {
+      const params: { startDate: string; endDate: string; doctorID?: number } = {
         startDate,
-        endDate
-      });
+        endDate,
+      };
+      if (doctorFilter) {
+        params.doctorID = Number(doctorFilter);
+      }
+      const result = await window.electronAPI.database.execute<FinanceSummary>('get-finance-summary', params);
       if (result.success && result.data) {
         setSummary(result.data);
       }
@@ -186,12 +209,34 @@ const Finance: React.FC = () => {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!summary) return;
+
+    // Fetch detailed payment data for export
+    interface DetailRow {
+      date: string;
+      patientName: string;
+      amount: number;
+      doctorName: string;
+      servicesUsed: string;
+      paymentMethod: string;
+      invoiceNo: string;
+    }
+
+    const params: { startDate: string; endDate: string; doctorID?: number } = { startDate, endDate };
+    if (doctorFilter) params.doctorID = Number(doctorFilter);
+
+    const detailResult = await window.electronAPI.database.execute<DetailRow[]>('get-finance-detail-export', params);
+    const details: DetailRow[] = (detailResult.success && detailResult.data) ? detailResult.data : [];
 
     // Generate CSV content
     let csvContent = 'Finance Report\n';
-    csvContent += `Period: ${startDate} to ${endDate}\n\n`;
+    csvContent += `Period: ${startDate} to ${endDate}\n`;
+    if (doctorFilter) {
+      const doc = doctors.find(d => d.doctorID === Number(doctorFilter));
+      if (doc) csvContent += `Doctor: Dr. ${doc.firstName} ${doc.lastName || ''}\n`;
+    }
+    csvContent += '\n';
 
     csvContent += 'Summary\n';
     csvContent += `Total Revenue,Rs ${summary.totalRevenue.toLocaleString()}\n`;
@@ -201,10 +246,11 @@ const Finance: React.FC = () => {
     csvContent += `Outstanding,Rs ${summary.totalOutstanding.toLocaleString()}\n`;
     csvContent += `Completed Visits,${summary.completedVisits}\n\n`;
 
-    csvContent += 'Daily Revenue\n';
-    csvContent += 'Date,Amount\n';
-    summary.revenueByDay.forEach(item => {
-      csvContent += `${item.date},Rs ${item.total.toLocaleString()}\n`;
+    csvContent += 'Payment Details\n';
+    csvContent += 'Date,Patient,Amount,Doctor,Service Used,Payment Method,Invoice No\n';
+    details.forEach(row => {
+      const escapeCsv = (val: string) => val?.includes(',') ? `"${val}"` : (val || '');
+      csvContent += `${row.date},${escapeCsv(row.patientName)},Rs ${row.amount.toLocaleString()},${escapeCsv(row.doctorName)},${escapeCsv(row.servicesUsed)},${row.paymentMethod},${row.invoiceNo}\n`;
     });
     csvContent += '\n';
 
@@ -283,7 +329,24 @@ const Finance: React.FC = () => {
               size="small"
             />
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Doctor</InputLabel>
+              <Select
+                value={doctorFilter}
+                label="Doctor"
+                onChange={(e) => setDoctorFilter(e.target.value)}
+              >
+                <MenuItem value="">All Doctors</MenuItem>
+                {doctors.map((doctor) => (
+                  <MenuItem key={doctor.doctorID} value={doctor.doctorID}>
+                    Dr. {doctor.firstName} {doctor.lastName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={2}>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 size="small"

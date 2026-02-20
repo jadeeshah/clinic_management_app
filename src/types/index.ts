@@ -72,9 +72,51 @@ export interface Patient {
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
   emergencyContactRelation: string | null;
+  diagnosis: string | null; // JSON array of ICD-10 codes
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ICD-10 Diagnosis Code
+export interface DiagnosisCode {
+  code: string;
+  description: string;
+  category: string;
+}
+
+// Investigation types
+export type InvestigationType =
+  | 'X-Ray'
+  | 'CT Scan'
+  | 'MRI'
+  | 'Ultrasound'
+  | 'NCS'
+  | 'EMG'
+  | 'Blood Test'
+  | 'Urine Test'
+  | 'ECG'
+  | 'DEXA Scan'
+  | 'Bone Scan'
+  | 'Other';
+
+export type InvestigationStatus = 'Ordered' | 'Scheduled' | 'Completed' | 'Reviewed';
+
+// Investigation (diagnostic tests)
+export interface Investigation {
+  investigationID: number;
+  patientID: number;
+  investigationType: InvestigationType;
+  investigationDate: string;
+  orderedByDoctorID: number | null;
+  bodyPart: string | null;
+  findings: string | null;
+  status: InvestigationStatus;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Joined fields
+  doctorName?: string;
 }
 
 // Services (lookup table)
@@ -114,7 +156,7 @@ export interface PatientPackage {
 
 // Unified Visits (replaces Appointments + Visits)
 export type VisitStatus = 'Scheduled' | 'InProgress' | 'Completed' | 'Cancelled' | 'NoShow';
-export type VisitType = 'Evaluation' | 'FollowUp' | 'TherapySession';
+export type VisitType = string;
 
 export interface Visit {
   visitID: number;

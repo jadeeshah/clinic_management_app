@@ -68,7 +68,7 @@ case 'get-patients': {
 | Page | Route | Description |
 |------|-------|-------------|
 | Dashboard | `/` | Quick stats, action cards, phone search |
-| Patients | `/patients` | CRUD, profile with tabs (Visits/Invoices/Files) |
+| Patients | `/patients` | CRUD, profile with tabs (Visits/Invoices/Investigations/Files) |
 | Visits | `/visits` | Unified scheduling (45-min default), status workflow |
 | Billing | `/billing` | Invoices, payments, next visit on invoice |
 | Finance | `/finance` | Revenue/expenses, CSV export |
@@ -98,7 +98,7 @@ better-sqlite3 requires compilation for Electron. The `postinstall` script runs 
 ### Commands
 
 ```bash
-npm test                                      # Run all tests (206 tests)
+npm test                                      # Run all tests (702 tests)
 npm test -- --no-coverage                     # Skip coverage report
 npm test -- --testPathPatterns="integration"  # Integration tests only
 npm test -- --testPathPatterns="unit"         # Unit tests only
@@ -109,12 +109,17 @@ npm test -- --testPathPatterns="unit"         # Unit tests only
 ```
 tests/
 ├── unit/           # Component and utility unit tests
+│   ├── timeValidation.test.ts     (25 tests) - Time/schedule validation
+│   ├── patientExport.test.ts      (12 tests) - CSV export utilities
+│   ├── icd10Codes.test.ts         (18 tests) - ICD-10 code search
+│   └── validation/                 # Zod schema tests
 ├── integration/    # Workflow integration tests
 │   ├── invoiceWorkflow.test.tsx   (13 tests)
 │   ├── packageWorkflow.test.tsx   (7 tests)
 │   ├── doctorWorkflow.test.tsx    (8 tests)
 │   ├── settingsWorkflow.test.tsx  (8 tests)
 │   ├── financeReports.test.tsx    (12 tests)
+│   ├── investigationWorkflow.test.tsx (17 tests) - Investigation CRUD
 │   └── ... (patient, visit, dashboard, appointment)
 ├── utils/testUtils.ts    # Custom render, mock factories
 ├── fixtures/seedData.ts  # Re-exports from src/database/seedData.ts
@@ -138,13 +143,15 @@ mockElectronAPI.database.execute.mockImplementation((operation: string) => {
 ### Mock Factories (testUtils.ts)
 
 ```typescript
-createMockPatient({ patientID: 1, firstName: 'John', lastName: 'Doe' })
+createMockPatient({ patientID: 1, firstName: 'John', lastName: 'Doe', diagnosis: 'M54.5' })
 createMockDoctor({ doctorID: 1, firstName: 'Sarah', specialization: 'PT' })
 createMockVisit({ visitID: 1, patientName: 'John Doe', status: 'Scheduled' })
 createMockInvoice({ invoiceID: 1, patientName: 'John Doe', status: 'Unpaid' })
 createMockPackage({ packageID: 1, name: 'Basic Package', totalSessions: 5 })
 createMockService({ serviceID: 1, code: 'PT-001', name: 'PT Session' })
 createMockDashboardStats({ todayVisits: 5, completedVisits: 3 })
+createMockInvestigation({ investigationID: 1, investigationType: 'X-Ray', status: 'Ordered' })
+createMockPatientPackage({ packageName: '10 Sessions', sessionsUsed: 3, totalSessions: 10 })
 ```
 
 ### Testing Tips
@@ -178,6 +185,36 @@ window.electronAPI.seed.getSummary()
 - 15 invoices (Paid, Unpaid, Partial)
 - 10 payments
 - 8 expenses
+
+## New Components & Utilities (v2.0.0)
+
+### Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `ICD10Selector` | `src/renderer/components/` | Modal for searching/selecting ICD-10 diagnosis codes |
+| `InvestigationForm` | `src/renderer/components/` | Form for creating/editing medical investigations |
+
+### Utilities
+
+| Utility | Location | Purpose |
+|---------|----------|---------|
+| `timeValidation.ts` | `src/renderer/utils/` | Doctor schedule validation functions |
+| `patientExport.ts` | `src/renderer/utils/` | CSV export for patient data |
+
+### Database Operations
+
+New operations added to `main.ts`:
+- `get-patient-investigations` - List investigations for a patient
+- `get-investigation` - Get single investigation by ID
+- `create-investigation` - Create new investigation record
+- `update-investigation` - Update existing investigation
+- `delete-investigation` - Delete investigation record
+
+### Validation Schemas
+
+New schema in `src/shared/validation/schemas/`:
+- `investigation.ts` - Zod schema for investigation validation
 
 ## Additional Notes
 

@@ -242,10 +242,6 @@ describe('Validation Helpers', () => {
         expect(result.success).toBe(false);
       });
 
-      it('should reject string', () => {
-        const result = positiveNumberSchema.safeParse('100');
-        expect(result.success).toBe(false);
-      });
     });
 
     describe('nonNegativeNumberSchema', () => {
@@ -294,10 +290,6 @@ describe('Validation Helpers', () => {
         expect(result.success).toBe(false);
       });
 
-      it('should reject string ID', () => {
-        const result = idSchema.safeParse('1');
-        expect(result.success).toBe(false);
-      });
     });
 
     describe('optionalIdSchema', () => {

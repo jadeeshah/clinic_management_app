@@ -53,10 +53,15 @@ import {
   InsertDriveFile as FileIcon,
   CardGiftcard as PackageIcon,
   Timeline as TimelineIcon,
+  Download as DownloadIcon,
+  Biotech as BiotechIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
-import type { Patient, Visit, Invoice, Attachment, PatientPackage, Package } from '../../types';
-import { TableSkeleton, EmptyState, TabPanel, PackageProgress, PatientTimeline } from '../components';
+import type { Patient, Visit, Invoice, Attachment, PatientPackage, Package, Investigation } from '../../types';
+import { TableSkeleton, EmptyState, TabPanel, PackageProgress, PatientTimeline, ICD10Selector, InvestigationForm } from '../components';
 import { formatDate } from '../utils/formatters';
+import { exportPatientToCSV, exportPatientListToCSV, downloadCSV } from '../utils/patientExport';
+import type { ICD10Code } from '../../data/icd10-codes';
 
 // Patient Form Component
 interface PatientFormProps {
@@ -82,6 +87,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ patient, onSave, onCancel, is
     emergencyContactRelation: '',
     notes: '',
   });
+  const [diagnosisCodes, setDiagnosisCodes] = useState<ICD10Code[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -90,6 +96,21 @@ const PatientForm: React.FC<PatientFormProps> = ({ patient, onSave, onCancel, is
         ...patient,
         dateOfBirth: patient.dateOfBirth || '',
       });
+      // Parse diagnosis codes from JSON string
+      if (patient.diagnosis) {
+        try {
+          const parsed = typeof patient.diagnosis === 'string'
+            ? JSON.parse(patient.diagnosis)
+            : patient.diagnosis;
+          if (Array.isArray(parsed)) {
+            setDiagnosisCodes(parsed);
+          }
+        } catch {
+          setDiagnosisCodes([]);
+        }
+      } else {
+        setDiagnosisCodes([]);
+      }
     }
   }, [patient]);
 
@@ -123,7 +144,12 @@ const PatientForm: React.FC<PatientFormProps> = ({ patient, onSave, onCancel, is
 
   const handleSubmit = async () => {
     if (validate()) {
-      await onSave(formData);
+      // Include diagnosis codes as JSON string
+      const dataToSave = {
+        ...formData,
+        diagnosis: diagnosisCodes.length > 0 ? JSON.stringify(diagnosisCodes) : null,
+      };
+      await onSave(dataToSave);
     }
   };
 
@@ -254,6 +280,20 @@ const PatientForm: React.FC<PatientFormProps> = ({ patient, onSave, onCancel, is
       </Grid>
 
       <Grid item xs={12}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+          Diagnosis (ICD-10)
+        </Typography>
+      </Grid>
+      <Grid item xs={12}>
+        <ICD10Selector
+          value={diagnosisCodes}
+          onChange={setDiagnosisCodes}
+          label="Diagnosis Codes"
+          placeholder="Search by ICD-10 code or description..."
+        />
+      </Grid>
+
+      <Grid item xs={12}>
         <TextField
           fullWidth
           label="Notes"
@@ -297,6 +337,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
   const [visits, setVisits] = useState<Visit[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [patientPackages, setPatientPackages] = useState<PatientPackage[]>([]);
   const [availablePackages, setAvailablePackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -304,6 +345,9 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
   const [selectedPackageID, setSelectedPackageID] = useState<number | ''>('');
+  const [isExportingPatient, setIsExportingPatient] = useState(false);
+  const [investigationFormOpen, setInvestigationFormOpen] = useState(false);
+  const [selectedInvestigation, setSelectedInvestigation] = useState<Investigation | null>(null);
 
   const handleCreateInvoice = () => {
     onClose();
@@ -317,12 +361,13 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
   const loadPatientData = async () => {
     setIsLoading(true);
     try {
-      const [visitsResult, invoicesResult, attachmentsResult, packagesResult, availableResult] = await Promise.all([
+      const [visitsResult, invoicesResult, attachmentsResult, packagesResult, availableResult, investigationsResult] = await Promise.all([
         window.electronAPI.database.execute<Visit[]>('get-patient-visits', { patientID: patient.patientID }),
         window.electronAPI.database.execute<Invoice[]>('get-patient-invoices', { patientID: patient.patientID }),
         window.electronAPI.database.execute<Attachment[]>('get-attachments', { entityType: 'Patient', entityID: patient.patientID }),
         window.electronAPI.database.execute<PatientPackage[]>('get-patient-packages', { patientID: patient.patientID }),
         window.electronAPI.database.execute<Package[]>('get-packages'),
+        window.electronAPI.database.execute<Investigation[]>('get-patient-investigations', { patientID: patient.patientID }),
       ]);
 
       if (visitsResult.success) setVisits(visitsResult.data || []);
@@ -330,6 +375,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
       if (attachmentsResult.success) setAttachments(attachmentsResult.data || []);
       if (packagesResult.success) setPatientPackages(packagesResult.data || []);
       if (availableResult.success) setAvailablePackages(availableResult.data || []);
+      if (investigationsResult.success) setInvestigations(investigationsResult.data || []);
     } catch (error) {
       console.error('Failed to load patient data:', error);
     } finally {
@@ -447,6 +493,29 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
     return `${age} years`;
   };
 
+  const handleExportPatient = async () => {
+    setIsExportingPatient(true);
+    try {
+      const result = await window.electronAPI.database.execute<{
+        patient: Patient;
+        visits: Visit[];
+        invoices: Invoice[];
+        packages: PatientPackage[];
+      }>('get-patient-export-data', { patientID: patient.patientID });
+
+      if (result.success && result.data) {
+        const csv = exportPatientToCSV(result.data);
+        const patientName = `${patient.firstName}_${patient.lastName || ''}`.replace(/\s+/g, '_');
+        const today = new Date().toISOString().split('T')[0];
+        downloadCSV(csv, `patient-${patientName}-${today}.csv`);
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setIsExportingPatient(false);
+    }
+  };
+
   return (
     <Box>
       {/* Header */}
@@ -458,6 +527,13 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
           <Chip label={patient.mrn} size="small" sx={{ mt: 1 }} />
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            startIcon={isExportingPatient ? <CircularProgress size={16} /> : <DownloadIcon />}
+            onClick={handleExportPatient}
+            disabled={isExportingPatient}
+          >
+            Export
+          </Button>
           <Button startIcon={<EditIcon />} onClick={onEdit}>
             Edit
           </Button>
@@ -566,6 +642,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
         <Tab icon={<PackageIcon />} label="Packages" />
         <Tab icon={<EventIcon />} label="Visits" />
         <Tab icon={<ReceiptIcon />} label="Invoices" />
+        <Tab icon={<BiotechIcon />} label="Investigations" />
         <Tab icon={<AttachFileIcon />} label="Files" />
       </Tabs>
 
@@ -719,8 +796,117 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
         )}
       </TabPanel>
 
-      {/* Files Tab */}
+      {/* Investigations Tab */}
       <TabPanel value={tabValue} index={4}>
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setSelectedInvestigation(null);
+              setInvestigationFormOpen(true);
+            }}
+          >
+            Add Investigation
+          </Button>
+        </Box>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : investigations.length > 0 ? (
+          <List>
+            {investigations.map((investigation, index) => (
+              <React.Fragment key={investigation.investigationID}>
+                <ListItem
+                  sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                  onClick={() => {
+                    setSelectedInvestigation(investigation);
+                    setInvestigationFormOpen(true);
+                  }}
+                >
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <BiotechIcon color="action" fontSize="small" />
+                        <Typography>{investigation.investigationType}</Typography>
+                        {investigation.bodyPart && (
+                          <Typography variant="body2" color="text.secondary">
+                            ({investigation.bodyPart})
+                          </Typography>
+                        )}
+                      </Box>
+                    }
+                    secondary={
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" component="span">
+                          {investigation.investigationDate}
+                          {investigation.doctorName && ` - Dr. ${investigation.doctorName}`}
+                        </Typography>
+                        {investigation.findings && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mt: 0.5, display: 'block' }}
+                          >
+                            {investigation.findings.length > 100
+                              ? `${investigation.findings.substring(0, 100)}...`
+                              : investigation.findings}
+                          </Typography>
+                        )}
+                      </Box>
+                    }
+                  />
+                  <ListItemSecondaryAction>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Chip
+                        label={investigation.status}
+                        size="small"
+                        color={
+                          investigation.status === 'Reviewed' ? 'success' :
+                          investigation.status === 'Completed' ? 'primary' :
+                          investigation.status === 'Scheduled' ? 'warning' : 'default'
+                        }
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm('Delete this investigation?')) {
+                            await window.electronAPI.database.execute('delete-investigation', {
+                              investigationID: investigation.investigationID,
+                            });
+                            setInvestigations(investigations.filter(
+                              i => i.investigationID !== investigation.investigationID
+                            ));
+                          }
+                        }}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </ListItemSecondaryAction>
+                </ListItem>
+                {index < investigations.length - 1 && <Divider />}
+              </React.Fragment>
+            ))}
+          </List>
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <BiotechIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+            <Typography color="text.secondary">
+              No investigations recorded
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Click "Add Investigation" to record X-rays, MRIs, etc.
+            </Typography>
+          </Box>
+        )}
+      </TabPanel>
+
+      {/* Files Tab */}
+      <TabPanel value={tabValue} index={5}>
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
@@ -822,6 +1008,25 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onEdit, onClos
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Investigation Form Dialog */}
+      <InvestigationForm
+        open={investigationFormOpen}
+        onClose={() => {
+          setInvestigationFormOpen(false);
+          setSelectedInvestigation(null);
+        }}
+        onSave={async () => {
+          // Reload investigations
+          const result = await window.electronAPI.database.execute<Investigation[]>(
+            'get-patient-investigations',
+            { patientID: patient.patientID }
+          );
+          if (result.success) setInvestigations(result.data || []);
+        }}
+        patientID={patient.patientID}
+        investigation={selectedInvestigation}
+      />
     </Box>
   );
 };
@@ -842,6 +1047,7 @@ const Patients: React.FC = () => {
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     // Check for action query param
@@ -958,14 +1164,56 @@ const Patients: React.FC = () => {
     setFormDialogOpen(true);
   };
 
+  const handleExportList = async () => {
+    setIsExporting(true);
+    try {
+      const result = await window.electronAPI.database.execute<{
+        patientID: number;
+        mrn: string;
+        firstName: string;
+        lastName: string;
+        phone: string;
+        city: string;
+        totalVisits: number;
+        completedVisits: number;
+        totalPaid: number;
+        createdAt: string;
+      }[]>('get-patients-list-export');
+
+      if (result.success && result.data) {
+        const csv = exportPatientListToCSV(result.data);
+        const today = new Date().toISOString().split('T')[0];
+        downloadCSV(csv, `patients-export-${today}.csv`);
+        setMessage({ type: 'success', text: `Exported ${result.data.length} patients` });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to export patients' });
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      setMessage({ type: 'error', text: 'Export failed' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <Box>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5">Patients</Typography>
-        <Button variant="contained" startIcon={<PersonAddIcon />} onClick={handleNewPatient}>
-          New Patient
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={isExporting ? <CircularProgress size={16} /> : <DownloadIcon />}
+            onClick={handleExportList}
+            disabled={isExporting}
+          >
+            Export List
+          </Button>
+          <Button variant="contained" startIcon={<PersonAddIcon />} onClick={handleNewPatient}>
+            New Patient
+          </Button>
+        </Box>
       </Box>
 
       {/* Messages */}

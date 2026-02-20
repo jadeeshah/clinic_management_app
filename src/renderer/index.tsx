@@ -56,6 +56,18 @@ const theme = createTheme({
   },
 });
 
+// Verify electronAPI is available (preload script loaded)
+if (typeof window.electronAPI === 'undefined') {
+  document.body.innerHTML = `
+    <div style="padding: 40px; font-family: sans-serif;">
+      <h1 style="color: red;">Application Error</h1>
+      <p>The application failed to initialize. electronAPI is not available.</p>
+      <p>This usually means the preload script failed to load.</p>
+    </div>
+  `;
+  throw new Error('electronAPI not available');
+}
+
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);

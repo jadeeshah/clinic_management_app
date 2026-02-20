@@ -78,11 +78,23 @@
     "appId": "com.clinic.management",
     "productName": "Physical Therapy Clinic Management",
     "directories": {
-      "output": "release"
+      "output": "release-final"
     },
     "files": [
       "dist/**/*",
-      "dist-main/**/*"
+      "dist-main/**/*",
+      "package.json",
+      "!node_modules",
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/bcryptjs/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*",
+      "node_modules/electron-is-dev/**/*",
+      "node_modules/zod/**/*"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
     ],
     "extraResources": [
       {
@@ -94,14 +106,17 @@
       }
     ],
     "win": {
-      "target": "nsis",
-      "icon": "public/icon.ico"
+      "target": ["nsis", "portable"],
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable.${ext}"
     }
   }
 }

@@ -4,7 +4,9 @@ node_modules/
 # Build outputs
 dist/
 dist-main/
+dist-release/
 release/
+release-final/
 
 # IDE
 .idea/
@@ -35,3 +37,7 @@ coverage/
 *.db
 *.sqlite
 *.sqlite3
+
+# Misc generated files
+nul
+/index.html

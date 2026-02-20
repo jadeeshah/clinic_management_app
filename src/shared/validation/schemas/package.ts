@@ -18,12 +18,12 @@ export const createPackageSchema = z.object({
     .string()
     .min(1, 'Package name is required')
     .max(200, 'Package name must be 200 characters or less'),
-  totalSessions: z
+  totalSessions: z.coerce
     .number()
     .int('Total sessions must be a whole number')
     .min(1, 'Package must include at least 1 session'),
   price: nonNegativeNumberSchema,
-  validityDays: z
+  validityDays: z.coerce
     .number()
     .int('Validity days must be a whole number')
     .min(1, 'Validity must be at least 1 day')

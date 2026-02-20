@@ -87,18 +87,30 @@ const PrintableInvoice: React.FC<PrintableInvoiceProps> = ({ invoice, items, set
 
       <Divider sx={{ mb: 3 }} />
 
-      {/* Bill To Section */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-          BILL TO:
-        </Typography>
-        <Typography variant="body1" fontWeight="bold">
-          {invoice.patientName}
-        </Typography>
-        {invoice.patientPhone && (
-          <Typography variant="body2">
-            Phone: {invoice.patientPhone}
+      {/* Bill To and Treated By Section */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
+        <Box>
+          <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+            BILL TO:
           </Typography>
+          <Typography variant="body1" fontWeight="bold">
+            {invoice.patientName}
+          </Typography>
+          {invoice.patientPhone && (
+            <Typography variant="body2">
+              Phone: {invoice.patientPhone}
+            </Typography>
+          )}
+        </Box>
+        {invoice.doctorName && (
+          <Box>
+            <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+              TREATED BY:
+            </Typography>
+            <Typography variant="body1" fontWeight="bold">
+              Dr. {invoice.doctorName}
+            </Typography>
+          </Box>
         )}
       </Box>
 

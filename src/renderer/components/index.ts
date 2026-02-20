@@ -24,3 +24,7 @@ export type { PatientTimelineProps } from './PatientTimeline';
 
 export { default as DoctorSchedule } from './DoctorSchedule';
 export type { DoctorScheduleProps } from './DoctorSchedule';
+
+export { default as ICD10Selector } from './ICD10Selector';
+
+export { default as InvestigationForm } from './InvestigationForm';

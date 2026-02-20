@@ -21,12 +21,8 @@ export const visitStatusEnum = z.enum([
   'NoShow',
 ]);
 
-// Visit type enum matching database CHECK constraint
-export const visitTypeEnum = z.enum([
-  'Evaluation',
-  'FollowUp',
-  'TherapySession',
-]);
+// Visit type - dynamic from Services table (no longer a fixed enum)
+export const visitTypeEnum = z.string().min(1, 'Visit type is required');
 
 /**
  * Schema for creating a new visit
@@ -37,7 +33,7 @@ export const createVisitSchema = z.object({
   visitDate: dateStringSchema,
   startTime: timeStringSchema,
   endTime: optionalTimeStringSchema,
-  duration: z
+  duration: z.coerce
     .number()
     .int('Duration must be a whole number')
     .min(5, 'Duration must be at least 5 minutes')

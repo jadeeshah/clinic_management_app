@@ -8,7 +8,7 @@ module.exports = (env, argv) => ({
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: argv.mode === 'production' ? '[name].[contenthash].js' : 'bundle.js',
-    publicPath: '/',
+    publicPath: argv.mode === 'production' ? './' : '/',
     clean: true,
   },
   resolve: {

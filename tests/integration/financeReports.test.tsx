@@ -120,10 +120,10 @@ describe('Finance Reports Integration Tests', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Daily Revenue')).toBeInTheDocument();
+        // Verify daily revenue entries - use getAllByText since Rs 18,000 appears twice
+        expect(screen.getAllByText('Rs 18,000').length).toBeGreaterThan(0);
       });
 
-      // Verify daily revenue entries - use getAllByText since Rs 18,000 appears twice
-      expect(screen.getAllByText('Rs 18,000').length).toBeGreaterThan(0);
       expect(screen.getByText('Rs 14,000')).toBeInTheDocument();
     });
 
@@ -142,10 +142,10 @@ describe('Finance Reports Integration Tests', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Expenses by Category')).toBeInTheDocument();
+        // Verify category breakdown
+        expect(screen.getByText('Rent')).toBeInTheDocument();
       });
 
-      // Verify category breakdown
-      expect(screen.getByText('Rent')).toBeInTheDocument();
       expect(screen.getByText('Supplies')).toBeInTheDocument();
       expect(screen.getByText('Utilities')).toBeInTheDocument();
     });

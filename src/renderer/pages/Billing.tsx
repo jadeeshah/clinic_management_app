@@ -35,6 +35,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  ListSubheader,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -43,7 +44,7 @@ import {
   Delete as DeleteIcon,
   Print as PrintIcon,
 } from '@mui/icons-material';
-import type { Invoice, Patient, Doctor, Service, InvoiceItem, Payment, Visit, Settings } from '../../types';
+import type { Invoice, Patient, Doctor, Service, InvoiceItem, Payment, Visit, Settings, Package } from '../../types';
 import PrintableInvoice from '../components/PrintableInvoice';
 import { StatusChip, TableSkeleton, EmptyState } from '../components';
 import { formatCurrency, formatDate } from '../utils/formatters';
@@ -74,6 +75,7 @@ const Billing: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [patientSearch, setPatientSearch] = useState('');
@@ -99,15 +101,20 @@ const Billing: React.FC = () => {
   // Patient's next scheduled visit for auto-populate
   const [patientNextVisit, setPatientNextVisit] = useState<Visit | null>(null);
 
+  // Store visitID when creating invoice from Visits page
+  const [visitIdForInvoice, setVisitIdForInvoice] = useState<number | null>(null);
+
   // Print state
   const [isPrinting, setIsPrinting] = useState(false);
   const [clinicSettings, setClinicSettings] = useState<Settings | null>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null);
 
   useEffect(() => {
     loadInvoices();
     loadDoctors();
     loadServices();
+    loadPackages();
     loadClinicSettings();
   }, []);
 
@@ -162,51 +169,72 @@ const Billing: React.FC = () => {
       let visitService: Service | null = null;
 
       if (visitID) {
+        setVisitIdForInvoice(visitID);  // Store visitID for invoice creation
         const visitResult = await window.electronAPI.database.execute<Visit>('get-visit', { visitID });
         if (visitResult.success && visitResult.data) {
           const visit = visitResult.data;
+
+          // Load doctors if not yet loaded
+          let doctorsList = doctors;
+          if (doctorsList.length === 0) {
+            const doctorResult = await window.electronAPI.database.execute<Doctor[]>('get-doctors');
+            if (doctorResult.success && doctorResult.data) {
+              doctorsList = doctorResult.data;
+              setDoctors(doctorsList);
+            }
+          }
+
+          // Load services if not yet loaded
+          let servicesList = services;
+          if (servicesList.length === 0) {
+            const serviceResult = await window.electronAPI.database.execute<Service[]>('get-services');
+            if (serviceResult.success && serviceResult.data) {
+              servicesList = serviceResult.data;
+              setServices(servicesList);
+            }
+          }
+
           // Find the doctor from the visit
-          visitDoctor = doctors.find(d => d.doctorID === visit.doctorID) || null;
-          // Find a service matching the visit type
-          const visitTypeServiceMap: Record<string, string> = {
-            'TherapySession': 'PT-001',
-            'Evaluation': 'PT-002',
-            'FollowUp': 'PT-001',
-          };
-          const serviceCode = visitTypeServiceMap[visit.visitType] || 'PT-001';
-          visitService = services.find(s => s.code === serviceCode) || services[0] || null;
+          visitDoctor = doctorsList.find(d => d.doctorID === visit.doctorID) || null;
+
+          // Find a service matching the visit type by name (dynamic services)
+          visitService = servicesList.find(s => s.name === visit.visitType)
+            || servicesList.find(s => s.code === 'PT-SESSION')
+            || servicesList[0] || null;
         }
       }
 
-      // Wait for doctors to load, then open dialog with patient and visit data pre-selected
-      setTimeout(async () => {
-        setSelectedDoctor(visitDoctor || (doctors.length > 0 ? doctors[0] : null));
-        setInvoiceDate(new Date().toISOString().split('T')[0]);
+      // Set dialog state and open immediately
+      setSelectedDoctor(visitDoctor || (doctors.length > 0 ? doctors[0] : null));
+      setInvoiceDate(new Date().toISOString().split('T')[0]);
 
-        // Pre-populate invoice items based on visit service
-        if (visitService) {
-          setInvoiceItems([{
-            serviceID: visitService.serviceID,
-            description: visitService.name,
-            quantity: 1,
-            unitPrice: visitService.defaultPrice,
-            lineTotal: visitService.defaultPrice
-          }]);
-        } else {
-          setInvoiceItems([{
-            serviceID: null,
-            description: '',
-            quantity: 1,
-            unitPrice: 0,
-            lineTotal: 0
-          }]);
-        }
+      // Pre-populate invoice items based on visit service
+      // Use doctor's session charge if available, otherwise service default
+      if (visitService) {
+        const price = (visitDoctor?.sessionCharge && visitDoctor.sessionCharge > 0)
+          ? visitDoctor.sessionCharge
+          : visitService.defaultPrice;
+        setInvoiceItems([{
+          serviceID: visitService.serviceID,
+          description: visitService.name,
+          quantity: 1,
+          unitPrice: price,
+          lineTotal: price
+        }]);
+      } else {
+        setInvoiceItems([{
+          serviceID: null,
+          description: '',
+          quantity: 1,
+          unitPrice: 0,
+          lineTotal: 0
+        }]);
+      }
 
-        setDiscountAmount(0);
-        setError(null);
-        await handlePatientSelect(patient);
-        setCreateDialogOpen(true);
-      }, 100);
+      setDiscountAmount(0);
+      setError(null);
+      await handlePatientSelect(patient);
+      setCreateDialogOpen(true);
     } catch (error) {
       console.error('Failed to load patient/visit:', error);
     }
@@ -249,6 +277,17 @@ const Billing: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load services:', error);
+    }
+  };
+
+  const loadPackages = async () => {
+    try {
+      const result = await window.electronAPI.database.execute<Package[]>('get-packages');
+      if (result.success && result.data) {
+        setPackages(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load packages:', error);
     }
   };
 
@@ -321,6 +360,23 @@ const Billing: React.FC = () => {
     loadInvoices();
   }, [statusFilter]);
 
+  // Update invoice item prices when doctor changes
+  useEffect(() => {
+    if (selectedDoctor?.sessionCharge && selectedDoctor.sessionCharge > 0 && invoiceItems.length > 0) {
+      setInvoiceItems(items => items.map(item => {
+        // Only update items that have a service selected (not custom items)
+        if (item.serviceID) {
+          return {
+            ...item,
+            unitPrice: selectedDoctor.sessionCharge,
+            lineTotal: item.quantity * selectedDoctor.sessionCharge
+          };
+        }
+        return item;
+      }));
+    }
+  }, [selectedDoctor]);
+
   const handleOpenCreateDialog = () => {
     setSelectedPatient(null);
     setSelectedDoctor(doctors.length > 0 ? doctors[0] : null);
@@ -336,6 +392,7 @@ const Billing: React.FC = () => {
     setNextVisitDate('');
     setNextVisitTime('');
     setPatientNextVisit(null);
+    setVisitIdForInvoice(null);  // Reset visitID when opening fresh dialog
     setError(null);
     setCreateDialogOpen(true);
   };
@@ -376,13 +433,32 @@ const Billing: React.FC = () => {
       newItems[index].lineTotal = newItems[index].quantity * newItems[index].unitPrice;
     }
 
-    // If service selected, auto-fill description and price
+    // If service/package selected, auto-fill description and price
     if (field === 'serviceID' && value) {
-      const service = services.find(s => s.serviceID === value);
-      if (service) {
-        newItems[index].description = service.name;
-        newItems[index].unitPrice = service.defaultPrice;
-        newItems[index].lineTotal = newItems[index].quantity * service.defaultPrice;
+      const strValue = String(value);
+      if (strValue.startsWith('pkg-')) {
+        // Package selected
+        const pkgID = Number(strValue.replace('pkg-', ''));
+        const pkg = packages.find(p => p.packageID === pkgID);
+        if (pkg) {
+          newItems[index].serviceID = null;
+          newItems[index].description = pkg.name;
+          newItems[index].unitPrice = pkg.price;
+          newItems[index].lineTotal = newItems[index].quantity * pkg.price;
+        }
+      } else {
+        // Service selected
+        const serviceID = Number(strValue);
+        const service = services.find(s => s.serviceID === serviceID);
+        if (service) {
+          newItems[index].serviceID = service.serviceID;
+          newItems[index].description = service.name;
+          const price = (selectedDoctor?.sessionCharge && selectedDoctor.sessionCharge > 0)
+            ? selectedDoctor.sessionCharge
+            : service.defaultPrice;
+          newItems[index].unitPrice = price;
+          newItems[index].lineTotal = newItems[index].quantity * price;
+        }
       }
     }
 
@@ -411,6 +487,7 @@ const Billing: React.FC = () => {
       const result = await window.electronAPI.database.execute<{ invoiceID: number; invoiceNo: string }>('create-invoice', {
         patientID: selectedPatient.patientID,
         doctorID: selectedDoctor?.doctorID || null,
+        visitID: visitIdForInvoice,  // Link invoice to source visit
         invoiceDate,
         items: validItems,
         discountAmount,
@@ -483,8 +560,22 @@ const Billing: React.FC = () => {
     }
   };
 
-  const handlePrintInvoice = () => {
+  const handlePrintInvoice = async () => {
     if (!selectedInvoice) return;
+
+    // Ensure clinic settings are loaded before printing
+    if (!clinicSettings) {
+      await loadClinicSettings();
+    }
+
+    // Warn if critical clinic info is missing
+    if (!clinicSettings?.address && !clinicSettings?.phone) {
+      setMessage({
+        type: 'warning',
+        text: 'Clinic address and phone are not configured. Go to Settings to add clinic details for invoices.',
+      });
+    }
+
     setIsPrinting(true);
     // Use setTimeout to ensure the print content is rendered before printing
     setTimeout(() => {
@@ -505,6 +596,13 @@ const Billing: React.FC = () => {
           New Invoice
         </Button>
       </Box>
+
+      {/* Messages */}
+      {message && (
+        <Alert severity={message.type} sx={{ mb: 2 }} onClose={() => setMessage(null)}>
+          {message.text}
+        </Alert>
+      )}
 
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
@@ -565,8 +663,8 @@ const Billing: React.FC = () => {
                 </TableRow>
               ) : (
                 invoices.map((invoice) => {
-                // For Paid invoices, balance should always be 0
-                const balance = invoice.status === 'Paid' ? 0 : invoice.total - (invoice.paidAmount || 0);
+                // Calculate balance from actual paid amount
+                const balance = invoice.total - (invoice.paidAmount || 0);
                 return (
                   <TableRow key={invoice.invoiceID} hover>
                     <TableCell>
@@ -579,7 +677,7 @@ const Billing: React.FC = () => {
                     </TableCell>
                     <TableCell align="right">
                       <Typography color="success.main">
-                        Rs {(invoice.status === 'Paid' ? invoice.total : (invoice.paidAmount || 0)).toLocaleString()}
+                        Rs {(invoice.paidAmount || 0).toLocaleString()}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -695,9 +793,16 @@ const Billing: React.FC = () => {
                           displayEmpty
                         >
                           <MenuItem value="">-- Custom --</MenuItem>
+                          <ListSubheader>Services</ListSubheader>
                           {services.map((service) => (
-                            <MenuItem key={service.serviceID} value={service.serviceID}>
-                              {service.name}
+                            <MenuItem key={`svc-${service.serviceID}`} value={service.serviceID}>
+                              {service.name} — Rs {service.defaultPrice.toLocaleString()}
+                            </MenuItem>
+                          ))}
+                          {packages.length > 0 && <ListSubheader>Packages</ListSubheader>}
+                          {packages.map((pkg) => (
+                            <MenuItem key={`pkg-${pkg.packageID}`} value={`pkg-${pkg.packageID}`}>
+                              {pkg.name} ({pkg.totalSessions} sessions) — Rs {pkg.price.toLocaleString()}
                             </MenuItem>
                           ))}
                         </Select>
