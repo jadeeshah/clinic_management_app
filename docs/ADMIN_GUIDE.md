@@ -66,7 +66,7 @@ The system includes these default services:
 2. Modify fields as needed
 3. Click **Save**
 
-Note: Price changes only affect new invoices, not existing ones.
+Note: Price changes only affect new invoices, not existing ones. Services also appear as **visit types** in the scheduling dropdown, so adding/removing services updates the visit type options throughout the app.
 
 ### Deactivating Services
 
@@ -440,8 +440,19 @@ This is a standalone desktop application:
 - **Investigations Module**: Track medical investigations (X-Ray, MRI, etc.) per patient
 - **Doctor Schedule Validation**: Automatic warnings when booking outside doctor's hours
 - **ICD-10 Diagnosis Codes**: Searchable diagnosis code database for standardized documentation
-- **Patient Data Export**: Staff can export patient records to CSV format
-- **Enhanced Printing**: Improved invoice and receipt layouts
+- **Patient Data Export**: Staff can export patient records to CSV with diagnosis, session #, payment, and package details
+- **Enhanced Printing**: Invoices show clinic logo, address, phone with missing-info warnings
+
+### Improvements
+
+- **Dynamic Visit Types**: Visit type dropdown loads from Services catalog — adding/removing services updates visit types app-wide
+- **Packages in Invoices**: Packages appear alongside services in invoice line item dropdown with auto-filled pricing
+- **Finance Doctor Filter**: Financial summary and reports can be filtered by doctor
+- **Detailed Finance Export**: CSV export includes Date, Patient, Amount, Doctor, Service, Payment Method, Invoice No
+
+### Architecture
+
+- **Refactored main process**: Database operations extracted into 16 handler modules under `src/main/handlers/` for maintainability
 
 ### Database Changes
 
@@ -450,6 +461,7 @@ New tables added:
 
 Schema updates:
 - `Patients`: Added `diagnosis` field for ICD-10 codes
+- `Visits`: Removed hardcoded `visitType` CHECK constraint (now accepts any service name)
 
 ---
 

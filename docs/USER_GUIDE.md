@@ -174,9 +174,11 @@ Export patient records to CSV for reporting or backup:
 
 1. Open patient profile
 2. Click **Export** button
-3. Choose export type:
-   - **Full Record**: Patient info, visits, invoices, packages
-   - **Visit History**: All visits with dates and status
+3. CSV includes:
+   - **Patient Info**: Name, phone, diagnosis, emergency contact
+   - **Visit History**: Date, patient name, phone, diagnosis, doctor, session #, payment, package, status, notes
+   - **Invoice History**: Invoice #, date, doctor, total, paid, status (with totals)
+   - **Packages**: Name, sessions used/remaining, status, dates
 4. CSV file downloads to your computer
 
 ### Attaching Files
@@ -255,10 +257,9 @@ Filter options:
 2. Select **Patient** (search by name or phone)
 3. Select **Doctor** (therapist)
 4. Choose **Date and Time**
-5. Select **Visit Type**:
-   - Evaluation (initial assessment)
-   - Therapy Session (regular treatment)
-   - Follow Up (check-in visit)
+5. Select **Visit Type** from the dropdown
+   - Visit types are loaded from the **Services** catalog (managed by admin)
+   - Common types: Evaluation, Therapy Session, Follow Up
 6. Optionally link to a **Package** (for session-based billing)
 7. Add any **Notes**
 8. Click **Save**
@@ -321,9 +322,9 @@ Filter options:
 2. Select **Patient**
 3. Select **Doctor** (for services rendered)
 4. Add **Line Items**:
-   - Select service from catalog
+   - Select from **Services** or **Packages** (grouped in dropdown)
+   - Price auto-fills from catalog
    - Adjust quantity if needed
-   - Price auto-fills from service catalog
 5. Apply **Discount** (optional):
    - Percentage or fixed amount
 6. Review **Totals**:
@@ -357,11 +358,13 @@ Invoices automatically update status based on payments:
 1. Open the invoice
 2. Click **Print** button
 3. Invoice opens in print preview with:
-   - Clinic logo and information
+   - Clinic logo and information (configured in Settings)
    - Patient details
    - Line items with prices
    - Payment summary
    - Balance due
+
+**Note**: If clinic address or phone number are not configured, a warning will prompt you to update them in Settings for complete invoices.
 
 ---
 
@@ -371,17 +374,20 @@ Invoices automatically update status based on payments:
 
 Navigate to **Finance** for revenue and expense tracking.
 
-### Revenue View
+### Summary Cards
 
-See all payments received:
-- Date and amount
-- Patient name
-- Payment method
-- Invoice reference
+At the top of the Finance page:
+- **Revenue**: Total payments collected
+- **Expenses**: Total expenses recorded
+- **Net Income**: Revenue minus expenses
+- **Completed Visits**: Total visits completed
+- **Outstanding Receivables**: Unpaid invoice balances
 
-Filter by:
-- Date range (Today, This Week, This Month, Custom)
-- Payment method
+### Filtering
+
+Filter financial data by:
+- **Date range**: This Month, Last Month, or custom Start/End dates
+- **Doctor**: Filter revenue by specific doctor
 
 ### Expense Tracking
 
@@ -396,10 +402,10 @@ Record clinic expenses:
 
 ### Export to CSV
 
-Export financial data for accounting:
-1. Set your date range filters
-2. Click **Export CSV**
-3. File downloads with all transactions in the selected period
+Export detailed financial data for accounting:
+1. Set your date range and doctor filters
+2. Click **Export Report**
+3. CSV downloads with columns: Date, Patient, Amount, Doctor, Service Used, Payment Method, Invoice No
 
 ---
 
@@ -486,5 +492,12 @@ For technical support or feature requests:
 - **Diagnosis with ICD-10 Codes**: Search and select standardized diagnosis codes
 - **Investigations Module**: Track X-Ray, MRI, CT Scan, and other medical investigations
 - **Doctor Schedule Validation**: Warnings when booking outside doctor's working hours
-- **Patient Data Export**: Export patient records to CSV format
-- **Enhanced Invoice Printing**: Improved print layout with better formatting
+- **Patient Data Export**: Export patient records to CSV with diagnosis, session #, payment, and package details
+- **Enhanced Invoice Printing**: Clinic logo, address, and phone with missing-info warnings
+
+### Improvements
+
+- **Dynamic Visit Types**: Visit type dropdown now loads from Services catalog instead of fixed options
+- **Packages in Invoices**: Packages appear alongside services in invoice line item dropdown with auto-filled pricing
+- **Finance Doctor Filter**: Filter financial summary and reports by doctor
+- **Detailed Finance Export**: CSV includes Date, Patient, Amount, Doctor, Service, Payment Method, Invoice No
